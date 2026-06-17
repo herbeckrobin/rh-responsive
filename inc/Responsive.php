@@ -47,6 +47,24 @@ final class Responsive
         return (bool) rhbp_setting(ResponsiveGroup::GROUP_ID, ResponsiveGroup::FIELD_VISIBILITY_ENABLED, true);
     }
 
+    private function allBlocksAllowed(): bool
+    {
+        return (bool) rhbp_setting(ResponsiveGroup::GROUP_ID, ResponsiveGroup::FIELD_ALL_BLOCKS, true);
+    }
+
+    /**
+     * Greift die Sichtbarkeits-Auswahl für diesen Block? Mit dem All-Blocks-
+     * Schalter jeder Block, sonst nur die kuratierte Core-Whitelist.
+     */
+    private function matchesBlock(string $blockName): bool
+    {
+        if ($blockName === '') {
+            return false;
+        }
+
+        return $this->allBlocksAllowed() || in_array($blockName, $this->blocks(), true);
+    }
+
     private function bp(string $field, int $default): int
     {
         $value = (int) rhbp_setting(ResponsiveGroup::GROUP_ID, $field, (string) $default);
@@ -93,7 +111,8 @@ final class Responsive
         if (trim($blockContent) === '') {
             return $blockContent;
         }
-        if (! in_array($block['blockName'] ?? '', $this->blocks(), true)) {
+        $blockName = $block['blockName'] ?? '';
+        if (! is_string($blockName) || ! $this->matchesBlock($blockName)) {
             return $blockContent;
         }
 
@@ -184,6 +203,7 @@ final class Responsive
         wp_localize_script('rh-responsive-editor', 'rhResponsiveConfig', [
             'attr' => self::ATTR,
             'blocks' => array_values($this->blocks()),
+            'allBlocks' => $this->allBlocksAllowed(),
         ]);
     }
 

@@ -28,6 +28,7 @@
 	var __ = (wp.i18n && wp.i18n.__) ? wp.i18n.__ : function (s) { return s; };
 
 	var BLOCKS = config.blocks;
+	var ALL_BLOCKS = !!config.allBlocks;
 	var ATTR = config.attr;
 	var DEVICES = [
 		{ key: 'mobile', label: __('Auf Mobile ausblenden', 'rh-responsive') },
@@ -35,11 +36,16 @@
 		{ key: 'desktop', label: __('Auf Desktop ausblenden', 'rh-responsive') }
 	];
 
+	// Greift die Sichtbarkeits-Auswahl für diesen Block? Mit allBlocks jeder Block, sonst die Whitelist.
+	function isAllowed(name) {
+		return !!name && (ALL_BLOCKS || BLOCKS.indexOf(name) !== -1);
+	}
+
 	addFilter(
 		'blocks.registerBlockType',
 		'rh-responsive/add-attribute',
 		function (settings, name) {
-			if (BLOCKS.indexOf(name) === -1) {
+			if (!isAllowed(name)) {
 				return settings;
 			}
 			var added = {};
@@ -52,7 +58,7 @@
 	var withVisibilityPanel = createHigherOrderComponent(
 		function (BlockEdit) {
 			return function (props) {
-				if (BLOCKS.indexOf(props.name) === -1) {
+				if (!isAllowed(props.name)) {
 					return el(BlockEdit, props);
 				}
 				var current = (props.attributes && props.attributes[ATTR]) || [];

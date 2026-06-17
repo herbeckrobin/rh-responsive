@@ -19,6 +19,7 @@ final class ResponsiveGroup implements GroupInterface
     public const GROUP_ID = 'responsive';
 
     public const FIELD_VISIBILITY_ENABLED = 'visibility_enabled';
+    public const FIELD_ALL_BLOCKS = 'all_blocks';
     public const FIELD_BP_TABLET = 'bp_tablet';
     public const FIELD_BP_DESKTOP = 'bp_desktop';
     public const FIELD_NAV_ENABLED = 'nav_enabled';
@@ -54,6 +55,14 @@ final class ResponsiveGroup implements GroupInterface
                 description: __('Fügt jedem Block eine Auswahl hinzu, ihn auf Mobile, Tablet oder Desktop auszublenden.', 'rh-responsive'),
                 default: true,
                 keywords: ['sichtbarkeit', 'visibility', 'mobile', 'tablet', 'desktop', 'ausblenden'],
+            ),
+            new SettingField(
+                id: self::FIELD_ALL_BLOCKS,
+                type: SettingField::TYPE_BOOLEAN,
+                label: __('Auf allen Blöcken', 'rh-responsive'),
+                description: __('An (Standard) = die Sichtbarkeits-Auswahl erscheint an jedem Block, auch Theme- und Custom-Blöcken. Aus = nur ein kuratierter Satz gängiger Core-Blöcke, falls du die Auswahl bewusst eingrenzen willst.', 'rh-responsive'),
+                default: true,
+                keywords: ['custom', 'theme', 'bloecke', 'alle', 'whitelist'],
             ),
             new SettingField(
                 id: self::FIELD_BP_TABLET,
