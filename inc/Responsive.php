@@ -24,6 +24,8 @@ use WP_HTML_Tag_Processor;
 final class Responsive
 {
     public const ATTR = 'rhResponsiveHide';
+    public const ATTR_REVERSE = 'rhReverseMobile';
+    public const CLASS_REVERSE = 'is-rh-reverse-mobile';
 
     /** @var array<string, string> */
     private const CLASS_MAP = [
@@ -36,6 +38,13 @@ final class Responsive
     {
         if ($this->visibilityEnabled()) {
             add_filter('render_block', [$this, 'addVisibilityClasses'], 10, 2);
+        }
+
+        if ($this->reverseEnabled()) {
+            add_filter('render_block', [$this, 'addReverseClass'], 10, 2);
+        }
+
+        if ($this->visibilityEnabled() || $this->reverseEnabled()) {
             add_action('enqueue_block_editor_assets', [$this, 'enqueueEditor']);
         }
 
@@ -45,6 +54,11 @@ final class Responsive
     private function visibilityEnabled(): bool
     {
         return (bool) rhbp_setting(ResponsiveGroup::GROUP_ID, ResponsiveGroup::FIELD_VISIBILITY_ENABLED, true);
+    }
+
+    private function reverseEnabled(): bool
+    {
+        return (bool) rhbp_setting(ResponsiveGroup::GROUP_ID, ResponsiveGroup::FIELD_REVERSE_ENABLED, true);
     }
 
     private function allBlocksAllowed(): bool
@@ -101,6 +115,57 @@ final class Responsive
         $filtered = (array) apply_filters('rh-blueprint/responsive/blocks', $blocks);
 
         return $filtered;
+    }
+
+    /**
+     * Blöcke, die den Mobil-Umkehr-Schalter bekommen. Bewusst nur Blöcke mit
+     * Flex-/Grid-Layout, bei denen eine Umkehrung überhaupt greift.
+     *
+     * @return array<int, string>
+     */
+    public function reverseBlocks(): array
+    {
+        $blocks = [
+            'core/columns',
+            'core/group',
+            'core/media-text',
+            'core/buttons',
+        ];
+
+        /** @var array<int, string> $filtered */
+        $filtered = (array) apply_filters('rh-blueprint/responsive/reverse-blocks', $blocks);
+
+        return $filtered;
+    }
+
+    private function matchesReverse(string $blockName): bool
+    {
+        return $blockName !== '' && in_array($blockName, $this->reverseBlocks(), true);
+    }
+
+    /**
+     * Umkehr-Klasse aufs erste Tag setzen, wenn der Block-Schalter gesetzt ist.
+     */
+    public function addReverseClass(string $blockContent, array $block): string
+    {
+        if (trim($blockContent) === '') {
+            return $blockContent;
+        }
+        $blockName = $block['blockName'] ?? '';
+        if (! is_string($blockName) || ! $this->matchesReverse($blockName)) {
+            return $blockContent;
+        }
+        if (empty($block['attrs'][self::ATTR_REVERSE])) {
+            return $blockContent;
+        }
+
+        $processor = new WP_HTML_Tag_Processor($blockContent);
+        if (! $processor->next_tag()) {
+            return $blockContent;
+        }
+        $processor->add_class(self::CLASS_REVERSE);
+
+        return $processor->get_updated_html();
     }
 
     /**
@@ -164,6 +229,20 @@ final class Responsive
             $css .= '@media (min-width:' . $desktop . 'px){.rh-hide-desktop{display:none !important}}';
         }
 
+        if ($this->reverseEnabled()) {
+            $reverseBp = $this->bp(ResponsiveGroup::FIELD_REVERSE_BREAKPOINT, 781);
+            // Umkehr + erzwungenes Stapeln in EINER Query: so gibt es keinen
+            // Zwischenbereich, in dem umgekehrt aber noch nicht gestapelt ist
+            // (Core stapelt Spalten erst bei 781, media-text bei 600).
+            $css .= '@media (max-width:' . $this->edge($reverseBp) . '){';
+            $css .= '.wp-block-columns.' . self::CLASS_REVERSE . ',';
+            $css .= '.wp-block-buttons.' . self::CLASS_REVERSE . ',';
+            $css .= '.wp-block-group.' . self::CLASS_REVERSE . '.is-layout-flex{flex-direction:column-reverse !important;flex-wrap:nowrap !important}';
+            $css .= '.wp-block-columns.' . self::CLASS_REVERSE . '>.wp-block-column{flex-basis:100% !important}';
+            $css .= '.wp-block-media-text.' . self::CLASS_REVERSE . '{grid-template-columns:100% !important;grid-template-areas:"content" "media" !important}';
+            $css .= '}';
+        }
+
         if ((bool) rhbp_setting(ResponsiveGroup::GROUP_ID, ResponsiveGroup::FIELD_NAV_ENABLED, false)) {
             $navBp = $this->bp(ResponsiveGroup::FIELD_NAV_BREAKPOINT, 782);
             // Unterhalb des Wunsch-Breakpoints den Hamburger erzwingen und den
@@ -204,6 +283,10 @@ final class Responsive
             'attr' => self::ATTR,
             'blocks' => array_values($this->blocks()),
             'allBlocks' => $this->allBlocksAllowed(),
+            'visibilityEnabled' => $this->visibilityEnabled(),
+            'reverseAttr' => self::ATTR_REVERSE,
+            'reverseBlocks' => array_values($this->reverseBlocks()),
+            'reverseEnabled' => $this->reverseEnabled(),
         ]);
     }
 

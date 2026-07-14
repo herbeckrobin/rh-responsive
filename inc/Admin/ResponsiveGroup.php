@@ -24,6 +24,8 @@ final class ResponsiveGroup implements GroupInterface
     public const FIELD_BP_DESKTOP = 'bp_desktop';
     public const FIELD_NAV_ENABLED = 'nav_enabled';
     public const FIELD_NAV_BREAKPOINT = 'nav_breakpoint';
+    public const FIELD_REVERSE_ENABLED = 'reverse_enabled';
+    public const FIELD_REVERSE_BREAKPOINT = 'reverse_breakpoint';
 
     public function id(): string
     {
@@ -95,6 +97,22 @@ final class ResponsiveGroup implements GroupInterface
                 description: __('Bis zu dieser Breite bleibt das Menü als Hamburger. Sinnvoll z.B. 782 oder 1024. Muss größer als 600 sein.', 'rh-responsive'),
                 default: '782',
                 keywords: ['navigation', 'breakpoint', 'hamburger'],
+            ),
+            new SettingField(
+                id: self::FIELD_REVERSE_ENABLED,
+                type: SettingField::TYPE_BOOLEAN,
+                label: __('Mobil: Reihenfolge umkehren', 'rh-responsive'),
+                description: __('Fügt Spalten-, Gruppen-, Medien-Text- und Button-Blöcken eine Auswahl hinzu, die Reihenfolge der Kinder auf Mobile umzukehren. Nützlich für Zickzack-Layouts (Bild-Text, Text-Bild), die sonst gestapelt zwei Bilder untereinander zeigen.', 'rh-responsive'),
+                default: true,
+                keywords: ['reihenfolge', 'umkehren', 'reverse', 'mobile', 'zickzack', 'spalten', 'columns'],
+            ),
+            new SettingField(
+                id: self::FIELD_REVERSE_BREAKPOINT,
+                type: SettingField::TYPE_TEXT,
+                label: __('Umkehr-Breakpoint (px)', 'rh-responsive'),
+                description: __('Bis zu dieser Breite gilt die Umkehrung. Darunter werden die Kinder gestapelt und umgekehrt. Standard 781 (entspricht dem Punkt, an dem WordPress Spalten von selbst stapelt). Bei anderen Werten wird das Stapeln mit übernommen, damit es keinen Zwischenbereich gibt.', 'rh-responsive'),
+                default: '781',
+                keywords: ['breakpoint', 'reverse', 'umkehren', 'mobile', 'spalten'],
             ),
         ];
     }

@@ -1,10 +1,11 @@
 /**
  * RH Responsive, Editor-Script (buildless).
  *
- * Hängt ein Array-Attribut an die erlaubten Blöcke und zeigt im Inspector drei
- * Schalter (Mobile/Tablet/Desktop ausblenden). Block-Whitelist + Attribut-Name
- * kommen aus PHP (window.rhResponsiveConfig). Frontend macht das CSS (Klassen
- * rh-hide-*), hier wird nur die Auswahl gepflegt.
+ * Ein Inspector-Panel "Responsive" mit zwei Features, jeweils per PHP schaltbar:
+ *  - Sichtbarkeit: Array-Attribut (Mobile/Tablet/Desktop ausblenden) an der Block-Whitelist.
+ *  - Mobil umkehren: Boolean-Attribut an Flex-/Grid-Blöcken (Spalten/Gruppe/Medien-Text/Buttons).
+ * Attribut-Namen, Block-Listen und Enable-Flags kommen aus PHP (window.rhResponsiveConfig).
+ * Frontend macht das CSS (Klassen rh-hide-*, is-rh-reverse-mobile), hier wird nur die Auswahl gepflegt.
  *
  * Nutzt window.wp.* UMD-Globals.
  */
@@ -14,7 +15,7 @@
 	if (!wp || !wp.hooks || !wp.element || !wp.blockEditor || !wp.components || !wp.compose) {
 		return;
 	}
-	if (!config || !Array.isArray(config.blocks)) {
+	if (!config) {
 		return;
 	}
 
@@ -27,9 +28,15 @@
 	var createHigherOrderComponent = wp.compose.createHigherOrderComponent;
 	var __ = (wp.i18n && wp.i18n.__) ? wp.i18n.__ : function (s) { return s; };
 
-	var BLOCKS = config.blocks;
+	var VIS_ENABLED = config.visibilityEnabled !== false && Array.isArray(config.blocks);
+	var VIS_BLOCKS = Array.isArray(config.blocks) ? config.blocks : [];
 	var ALL_BLOCKS = !!config.allBlocks;
-	var ATTR = config.attr;
+	var VIS_ATTR = config.attr;
+
+	var REV_ENABLED = !!config.reverseEnabled && Array.isArray(config.reverseBlocks);
+	var REV_BLOCKS = Array.isArray(config.reverseBlocks) ? config.reverseBlocks : [];
+	var REV_ATTR = config.reverseAttr;
+
 	var DEVICES = [
 		{ key: 'mobile', label: __('Auf Mobile ausblenden', 'rh-responsive') },
 		{ key: 'tablet', label: __('Auf Tablet ausblenden', 'rh-responsive') },
@@ -37,47 +44,78 @@
 	];
 
 	// Greift die Sichtbarkeits-Auswahl für diesen Block? Mit allBlocks jeder Block, sonst die Whitelist.
-	function isAllowed(name) {
-		return !!name && (ALL_BLOCKS || BLOCKS.indexOf(name) !== -1);
+	function visAllowed(name) {
+		return VIS_ENABLED && !!name && (ALL_BLOCKS || VIS_BLOCKS.indexOf(name) !== -1);
+	}
+
+	// Greift der Umkehr-Schalter für diesen Block? Nur die feste Flex-/Grid-Zielliste.
+	function revAllowed(name) {
+		return REV_ENABLED && !!name && REV_BLOCKS.indexOf(name) !== -1;
 	}
 
 	addFilter(
 		'blocks.registerBlockType',
 		'rh-responsive/add-attribute',
 		function (settings, name) {
-			if (!isAllowed(name)) {
+			var added = {};
+			if (visAllowed(name)) {
+				added[VIS_ATTR] = { type: 'array', default: [] };
+			}
+			if (revAllowed(name)) {
+				added[REV_ATTR] = { type: 'boolean', default: false };
+			}
+			if (Object.keys(added).length === 0) {
 				return settings;
 			}
-			var added = {};
-			added[ATTR] = { type: 'array', default: [] };
 			settings.attributes = Object.assign({}, settings.attributes, added);
 			return settings;
 		}
 	);
 
-	var withVisibilityPanel = createHigherOrderComponent(
+	var withResponsivePanel = createHigherOrderComponent(
 		function (BlockEdit) {
 			return function (props) {
-				if (!isAllowed(props.name)) {
+				var showVis = visAllowed(props.name);
+				var showRev = revAllowed(props.name);
+				if (!showVis && !showRev) {
 					return el(BlockEdit, props);
 				}
-				var current = (props.attributes && props.attributes[ATTR]) || [];
 
-				var toggles = DEVICES.map(function (d) {
-					return el(ToggleControl, {
-						key: d.key,
-						label: d.label,
-						checked: current.indexOf(d.key) !== -1,
-						onChange: function () {
-							var next = current.slice();
-							var i = next.indexOf(d.key);
-							if (i === -1) { next.push(d.key); } else { next.splice(i, 1); }
+				var attrs = props.attributes || {};
+				var controls = [];
+
+				if (showVis) {
+					var current = attrs[VIS_ATTR] || [];
+					DEVICES.forEach(function (d) {
+						controls.push(el(ToggleControl, {
+							key: 'vis-' + d.key,
+							label: d.label,
+							checked: current.indexOf(d.key) !== -1,
+							onChange: function () {
+								var next = current.slice();
+								var i = next.indexOf(d.key);
+								if (i === -1) { next.push(d.key); } else { next.splice(i, 1); }
+								var update = {};
+								update[VIS_ATTR] = next;
+								props.setAttributes(update);
+							}
+						}));
+					});
+				}
+
+				if (showRev) {
+					controls.push(el(ToggleControl, {
+						key: 'reverse',
+						label: __('Mobil: Reihenfolge umkehren', 'rh-responsive'),
+						help: __('Kehrt die Reihenfolge der Kinder auf Mobile um (z.B. für Zickzack-Layouts).', 'rh-responsive'),
+						checked: !!attrs[REV_ATTR],
+						onChange: function (value) {
 							var update = {};
-							update[ATTR] = next;
+							update[REV_ATTR] = !!value;
 							props.setAttributes(update);
 						}
-					});
-				});
+					}));
+				}
 
 				return el(
 					Fragment,
@@ -88,8 +126,8 @@
 						null,
 						el(
 							PanelBody,
-							{ title: __('Sichtbarkeit', 'rh-responsive'), initialOpen: false },
-							toggles
+							{ title: __('Responsive', 'rh-responsive'), initialOpen: false },
+							controls
 						)
 					)
 				);
@@ -98,5 +136,5 @@
 		'withRhResponsivePanel'
 	);
 
-	addFilter('editor.BlockEdit', 'rh-responsive/inspector', withVisibilityPanel);
+	addFilter('editor.BlockEdit', 'rh-responsive/inspector', withResponsivePanel);
 })(window.wp, window.rhResponsiveConfig);
