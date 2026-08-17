@@ -5,7 +5,7 @@
  * Plugin URI:        https://github.com/herbeckrobin/rh-responsive
  * Update URI:        https://github.com/herbeckrobin/rh-responsive
  * Description:       Schließt WP-Responsive-Lücken: konfigurierbarer Navigations-Breakpoint und per-Block-Sichtbarkeit (Mobile/Tablet/Desktop ausblenden). Teil der rh-blueprint Kollektion.
- * Version:           0.3.1
+ * Version:           0.3.2
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Robin Herbeck
@@ -21,7 +21,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('RHRESP_VERSION', '0.3.1');
+define('RHRESP_VERSION', '0.3.2');
 define('RHRESP_PLUGIN_FILE', __FILE__);
 define('RHRESP_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('RHRESP_PLUGIN_URL', plugin_dir_url(__FILE__));
