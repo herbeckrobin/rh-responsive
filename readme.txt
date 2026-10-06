@@ -4,7 +4,7 @@ Tags: responsive, visibility, navigation, breakpoint, mobile
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.3.3
+Stable tag: 0.3.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,10 @@ The block list for the visibility control is extensible via the rh-blueprint/res
 Part of the rh-blueprint collection. Settings live under RH Blueprint > Responsive.
 
 == Changelog ==
+
+= 0.3.4 =
+* White label: when the core (2.9 or later) has a brand set, the module name in notices uses the brand instead of "RH".
+* Author URI points to robinherbeck.com. Adds the GPLv2 LICENSE file.
 
 = 0.3.3 =
 * Update checks: use a GitHub token from RH_GITHUB_TOKEN (environment variable or wp-config constant) when one is set, which lifts the API limit from 60 to 5,000 requests per hour. Without a token nothing changes.
