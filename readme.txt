@@ -4,7 +4,7 @@ Tags: responsive, visibility, navigation, breakpoint, mobile
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.3.4
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,9 @@ The block list for the visibility control is extensible via the rh-blueprint/res
 Part of the rh-blueprint collection. Settings live under RH Blueprint > Responsive.
 
 == Changelog ==
+
+= 0.4.0 =
+* Editor: the device preview now shows what the front end shows at that width. Blocks hidden for a device are hidden in the editor canvas too, and "Reverse on mobile" reverses the order there. A hidden block stays visible while it or one of its children is selected, faded and outlined, so it can still be edited. The front end output is unchanged.
 
 = 0.3.4 =
 * White label: when the core (2.9 or later) has a brand set, the module name in notices uses the brand instead of "RH".

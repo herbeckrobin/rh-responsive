@@ -19,7 +19,12 @@ use WP_HTML_Tag_Processor;
  * Open-Button zeigen und den Inline-Container verstecken (versionsrobust, weil wir
  * core nur im Bereich UNTER dem Wunsch-Breakpoint überschreiben).
  *
- * CSS + Klassen nur im Frontend, nicht im Editor (sonst verschwinden Blöcke beim Pflegen).
+ * Frontend: Klassen per render_block, CSS inline im <head>.
+ * Editor: dieselben Klassen setzt visibility-editor.js im Canvas aus den
+ * Block-Attributen, dasselbe CSS kommt aus css(true). Die Geräte-Vorschau zeigt
+ * damit, was das Frontend bei dieser Breite zeigt. Ausgeblendete Blöcke bleiben
+ * sichtbar, solange sie oder ein Kind ausgewählt sind, sonst ließen sie sich im
+ * Canvas nicht mehr pflegen.
  */
 final class Responsive
 {
@@ -216,6 +221,25 @@ final class Responsive
             return;
         }
 
+        $css = $this->css(false);
+
+        if ($css === '') {
+            return;
+        }
+
+        echo "\n" . '<style id="rh-responsive">' . $css . '</style>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- nur generierte numerische Breakpoints + feste Selektoren
+    }
+
+    /**
+     * Das CSS für Sichtbarkeit, Umkehr und Navigation, eine Quelle für Frontend
+     * und Editor-Canvas.
+     *
+     * Im Editor ($editor = true) bleibt ein ausgeblendeter Block sichtbar,
+     * solange er oder ein Kind ausgewählt ist, gestrichelt umrandet und blass.
+     * Der Navigations-Override fehlt dort, das Menü wird im Canvas nicht bedient.
+     */
+    public function css(bool $editor): string
+    {
         $css = '';
 
         if ($this->visibilityEnabled()) {
@@ -224,9 +248,9 @@ final class Responsive
             $mobileMax = $this->edge($tablet);
             $tabletMax = $this->edge($desktop);
 
-            $css .= '@media (max-width:' . $mobileMax . '){.rh-hide-mobile{display:none !important}}';
-            $css .= '@media (min-width:' . $tablet . 'px) and (max-width:' . $tabletMax . '){.rh-hide-tablet{display:none !important}}';
-            $css .= '@media (min-width:' . $desktop . 'px){.rh-hide-desktop{display:none !important}}';
+            $css .= '@media (max-width:' . $mobileMax . '){' . $this->hideRule('rh-hide-mobile', $editor) . '}';
+            $css .= '@media (min-width:' . $tablet . 'px) and (max-width:' . $tabletMax . '){' . $this->hideRule('rh-hide-tablet', $editor) . '}';
+            $css .= '@media (min-width:' . $desktop . 'px){' . $this->hideRule('rh-hide-desktop', $editor) . '}';
         }
 
         if ($this->reverseEnabled()) {
@@ -243,7 +267,7 @@ final class Responsive
             $css .= '}';
         }
 
-        if ((bool) rhbp_setting(ResponsiveGroup::GROUP_ID, ResponsiveGroup::FIELD_NAV_ENABLED, false)) {
+        if (! $editor && (bool) rhbp_setting(ResponsiveGroup::GROUP_ID, ResponsiveGroup::FIELD_NAV_ENABLED, false)) {
             $navBp = $this->bp(ResponsiveGroup::FIELD_NAV_BREAKPOINT, 782);
             // Unterhalb des Wunsch-Breakpoints den Hamburger erzwingen und den
             // Inline-Container verstecken, überschreibt core's 600px-Umschaltung.
@@ -253,11 +277,21 @@ final class Responsive
             $css .= '}';
         }
 
-        if ($css === '') {
-            return;
+        return $css;
+    }
+
+    /**
+     * Ausblende-Regel für eine Klasse. Im Frontend schlicht display:none, im
+     * Editor nur für nicht ausgewählte Blöcke, ausgewählte werden markiert.
+     */
+    private function hideRule(string $class, bool $editor): string
+    {
+        if (! $editor) {
+            return '.' . $class . '{display:none !important}';
         }
 
-        echo "\n" . '<style id="rh-responsive">' . $css . '</style>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- nur generierte numerische Breakpoints + feste Selektoren
+        return '.' . $class . ':not(.is-selected):not(.has-child-selected){display:none !important}'
+            . '.' . $class . '.is-selected,.' . $class . '.has-child-selected{opacity:.55;outline:2px dashed currentColor;outline-offset:2px}';
     }
 
     /**
@@ -274,7 +308,7 @@ final class Responsive
         wp_enqueue_script(
             'rh-responsive-editor',
             RHRESP_PLUGIN_URL . $jsRel,
-            ['wp-hooks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-compose', 'wp-i18n'],
+            ['wp-hooks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-compose', 'wp-i18n', 'wp-data'],
             (string) filemtime($jsAbs),
             true
         );
@@ -287,6 +321,9 @@ final class Responsive
             'reverseAttr' => self::ATTR_REVERSE,
             'reverseBlocks' => array_values($this->reverseBlocks()),
             'reverseEnabled' => $this->reverseEnabled(),
+            'classMap' => self::CLASS_MAP,
+            'reverseClass' => self::CLASS_REVERSE,
+            'canvasCss' => $this->css(true),
         ]);
     }
 

@@ -5,7 +5,12 @@
  *  - Sichtbarkeit: Array-Attribut (Mobile/Tablet/Desktop ausblenden) an der Block-Whitelist.
  *  - Mobil umkehren: Boolean-Attribut an Flex-/Grid-Blöcken (Spalten/Gruppe/Medien-Text/Buttons).
  * Attribut-Namen, Block-Listen und Enable-Flags kommen aus PHP (window.rhResponsiveConfig).
- * Frontend macht das CSS (Klassen rh-hide-*, is-rh-reverse-mobile), hier wird nur die Auswahl gepflegt.
+ *
+ * Canvas-Ansicht: Im Frontend setzt PHP die Klassen rh-hide-* und is-rh-reverse-mobile
+ * per render_block. Der Editor rendert nicht über PHP, deshalb setzt dieses Script
+ * dieselben Klassen an die Block-Wrapper im Canvas und spielt dasselbe CSS ein
+ * (config.canvasCss, aus Responsive::css(true)). Die Geräte-Vorschau zeigt damit, was
+ * das Frontend bei dieser Breite zeigt. Ausgewählte Blöcke bleiben sichtbar, markiert.
  *
  * Nutzt window.wp.* UMD-Globals.
  */
@@ -137,4 +142,110 @@
 	);
 
 	addFilter('editor.BlockEdit', 'rh-responsive/inspector', withResponsivePanel);
+
+	// ------------------------------------------------------------------
+	// Canvas-Ansicht
+	// ------------------------------------------------------------------
+
+	var CLASS_MAP = config.classMap || {};
+	var REV_CLASS = config.reverseClass || '';
+	var CANVAS_CSS = config.canvasCss || '';
+	var STYLE_ID = 'rh-responsive-canvas';
+
+	if (!wp.data || !CANVAS_CSS) {
+		return;
+	}
+
+	// Der Canvas ist ein Iframe (editor-canvas). Ohne Iframe, etwa bei alten
+	// Blöcken ohne apiVersion 3, rendert der Editor direkt ins Dokument.
+	function canvasDocument() {
+		var frame = document.querySelector('iframe[name="editor-canvas"]');
+		if (frame && frame.contentDocument && frame.contentDocument.body) {
+			return frame.contentDocument;
+		}
+		return document.querySelector('.editor-styles-wrapper') ? document : null;
+	}
+
+	function ensureStyle(doc) {
+		if (doc.getElementById(STYLE_ID)) {
+			return;
+		}
+		var style = doc.createElement('style');
+		style.id = STYLE_ID;
+		style.textContent = CANVAS_CSS;
+		(doc.head || doc.body).appendChild(style);
+	}
+
+	function wantedClasses(name, attrs) {
+		var classes = [];
+		if (visAllowed(name)) {
+			(attrs[VIS_ATTR] || []).forEach(function (key) {
+				if (CLASS_MAP[key]) {
+					classes.push(CLASS_MAP[key]);
+				}
+			});
+		}
+		if (REV_CLASS && revAllowed(name) && attrs[REV_ATTR]) {
+			classes.push(REV_CLASS);
+		}
+		return classes;
+	}
+
+	var ALL_CLASSES = Object.keys(CLASS_MAP).map(function (k) { return CLASS_MAP[k]; }).concat(REV_CLASS ? [REV_CLASS] : []);
+
+	function sync() {
+		var doc = canvasDocument();
+		if (!doc) {
+			return;
+		}
+		ensureStyle(doc);
+
+		var store = wp.data.select('core/block-editor');
+		if (!store || !store.getClientIdsWithDescendants) {
+			return;
+		}
+		store.getClientIdsWithDescendants().forEach(function (clientId) {
+			var node = doc.querySelector('[data-block="' + clientId + '"]');
+			if (!node) {
+				return;
+			}
+			var wanted = wantedClasses(store.getBlockName(clientId), store.getBlockAttributes(clientId) || {});
+			ALL_CLASSES.forEach(function (cls) {
+				var soll = wanted.indexOf(cls) !== -1;
+				if (node.classList.contains(cls) !== soll) {
+					node.classList.toggle(cls, soll);
+				}
+			});
+		});
+	}
+
+	// Gebündelt pro Frame: der Store meldet sehr oft, der Canvas baut Blöcke
+	// nachträglich auf, und ein Wechsel der Geräte-Vorschau ersetzt das Iframe.
+	var geplant = false;
+	function schedule() {
+		if (geplant) {
+			return;
+		}
+		geplant = true;
+		window.requestAnimationFrame(function () {
+			geplant = false;
+			sync();
+			watchCanvas();
+		});
+	}
+
+	var beobachtet = null;
+	var observer = new MutationObserver(schedule);
+	function watchCanvas() {
+		var doc = canvasDocument();
+		if (!doc || doc === beobachtet) {
+			return;
+		}
+		observer.disconnect();
+		observer.observe(doc.body, { childList: true, subtree: true });
+		beobachtet = doc;
+	}
+
+	wp.data.subscribe(schedule);
+	schedule();
 })(window.wp, window.rhResponsiveConfig);
